@@ -141,6 +141,13 @@ void uart_send_string(char *str)
 {
         /* LAB 1 TODO 3 BEGIN */
         /* BLANK BEGIN */
+		while (*str != '\0') {              // 遍历字符串直到遇到终止符 '\0'
+			while (uart_get_status() & UART_TX_FULL) {
+				// 等待 UART 发送缓冲区空闲
+			}
+			uart_putc(*str);                // 发送当前字符
+			str++;                          // 移动到下一个字符
+		}
         /* BLANK END */
         /* LAB 1 TODO 3 END */
 }
