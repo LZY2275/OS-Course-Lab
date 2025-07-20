@@ -53,10 +53,36 @@ __maybe_unused static struct page *split_chunk(struct phys_mem_pool *__maybe_unu
          * Hint: Recursively put the buddy of current chunk into
          * a suitable free list.
          */
-        /* BLANK BEGIN */
-        return NULL;
+        int current_order;
+        struct page *buddy;
 
-        /* BLANK END */
+        /* Get the current order of the chunk */
+        current_order = chunk->order;
+
+        /* If we've reached the desired order, return the chunk */
+        if (current_order == order) {
+                chunk->allocated = 1;
+                return chunk;
+        }
+
+        /* Split the chunk into two buddies */
+        current_order--;
+        buddy = chunk + (1 << current_order);
+
+        /* Initialize buddy's metadata */
+        buddy->allocated = 0;
+        buddy->order = current_order;
+        buddy->pool = pool;
+
+        /* Update the original chunk's metadata */
+        chunk->order = current_order;
+
+        /* Add the buddy to the appropriate free list */
+        list_add(&buddy->node, &pool->free_lists[current_order].free_list);
+        pool->free_lists[current_order].nr_free++;
+
+        /* Recursively split the remaining chunk */
+        return split_chunk(pool, order, chunk);
         /* LAB 2 TODO 1 END */
 }
 
@@ -70,10 +96,40 @@ __maybe_unused static struct page * merge_chunk(struct phys_mem_pool *__maybe_un
          * Hint: Recursively merge current chunk with its buddy
          * if possible.
          */
-        /* BLANK BEGIN */
-        return NULL;
+        unsigned long chunk_idx, buddy_idx;
+        struct page *buddy;
+        int order = chunk->order;
 
-        /* BLANK END */
+        // 当块的order达到BUDDY_MAX_ORDER-1时停止合并（已经达到最大块大小）
+        if (order >= BUDDY_MAX_ORDER - 1)
+                return chunk;
+
+        /* Calculate buddy's index */
+        chunk_idx = chunk - pool->page_metadata;
+        buddy_idx = chunk_idx ^ (1 << order);
+        buddy = pool->page_metadata + buddy_idx;
+
+        /* Check if buddy is free and of the same order */
+        if (buddy->allocated == 0 && buddy->order == order) {
+                /* Remove both chunks from their free lists */
+                list_del(&chunk->node);
+                list_del(&buddy->node);
+                pool->free_lists[order].nr_free -= 2;
+
+                /* Determine which page will be the merged block */
+                if (chunk_idx > buddy_idx) {
+                        chunk = buddy;
+                }
+
+                /* Increase the order of the merged block */
+                chunk->order++;
+
+                /* Recursively try to merge further */
+                return merge_chunk(pool, chunk);
+        }
+
+        /* If no merge possible, return the original chunk */
+        return chunk;
         /* LAB 2 TODO 1 END */
 }
 
@@ -91,9 +147,11 @@ void init_buddy(struct phys_mem_pool *pool, struct page *start_page,
         int page_idx;
         struct page *page;
 
+        // 初始化物理内存池的锁
         BUG_ON(lock_init(&pool->buddy_lock) != 0);
 
         /* Init the physical memory pool. */
+        // 初始化内存池基本信息
         pool->pool_start_addr = start_addr;
         pool->page_metadata = start_page;
         pool->pool_mem_size = page_num * BUDDY_PAGE_SIZE;
@@ -101,16 +159,24 @@ void init_buddy(struct phys_mem_pool *pool, struct page *start_page,
         pool->pool_phys_page_num = page_num;
 
         /* Init the free lists */
+        // 初始化空闲链表
         for (order = 0; order < BUDDY_MAX_ORDER; ++order) {
+                // 将每个order的空闲页面数量nr_free初始化为0
                 pool->free_lists[order].nr_free = 0;
+                // 初始化每个order的空闲链表头free_list
                 init_list_head(&(pool->free_lists[order].free_list));
         }
 
         /* Clear the page_metadata area. */
+        // 清零页面元数据
         memset((char *)start_page, 0, page_num * sizeof(struct page));
 
         /* Init the page_metadata area. */
+        // 初始化每个页面的元数据
         for (page_idx = 0; page_idx < page_num; ++page_idx) {
+                // 设置每个页面的初始状态
+                // 分配状态为已分配，order为0
+                // pool指向当前物理内存池
                 page = start_page + page_idx;
                 page->allocated = 1;
                 page->order = 0;
@@ -118,12 +184,18 @@ void init_buddy(struct phys_mem_pool *pool, struct page *start_page,
         }
 
         /* Put each physical memory page into the free lists. */
+        // 将每个物理页面放入空闲链表
         for (page_idx = 0; page_idx < page_num; ++page_idx) {
                 page = start_page + page_idx;
                 buddy_free_pages(pool, page);
         }
 }
 
+/**
+ * 伙伴系统的内存分配功能
+ * @param pool 物理内存池
+ * @param order 指定的order开始查找可用的内存块
+ */
 struct page *buddy_get_pages(struct phys_mem_pool *pool, int order)
 {
         int cur_order;
@@ -143,21 +215,44 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, int order)
          * Hint: Find a chunk that satisfies the order requirement
          * in the free lists, then split it if necessary.
          */
-        /* BLANK BEGIN */
-        UNUSED(cur_order);
-        UNUSED(free_list);
+        for (cur_order = order; cur_order < BUDDY_MAX_ORDER; cur_order++) {
+                free_list = &pool->free_lists[cur_order].free_list;
+                if (!list_empty(free_list)) {
+                        /* Found a suitable block, remove it from free list */
+                        page = list_entry(free_list->next, struct page, node);
+                        list_del(&page->node);
+                        pool->free_lists[cur_order].nr_free--;
 
-        /* BLANK END */
+                        /* If we found a larger block than needed, split it */
+                        if (cur_order > order) {
+                                page = split_chunk(pool, order, page);
+                        } else {
+                                page->allocated = 1;
+                                page->order = order;
+                        }
+
+                        goto out;
+                }
+        }
+
         /* LAB 2 TODO 1 END */
 out: __maybe_unused
         unlock(&pool->buddy_lock);
         return page;
 }
 
+/**
+ * 将一个页面释放回伙伴系统的空闲链表中,
+ * 并尝试与相邻的伙伴块合并以形成更大的空闲块
+ * @param pool 物理内存池
+ * @param page 要释放的页面
+ */
 void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 {
         int order;
         struct list_head *free_list;
+        struct page *buddy;
+        unsigned long page_idx, buddy_idx;
         lock(&pool->buddy_lock);
 
         /* LAB 2 TODO 1 BEGIN */
@@ -165,10 +260,17 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
          * Hint: Merge the chunk with its buddy and put it into
          * a suitable free list.
          */
-        /* BLANK BEGIN */
-        UNUSED(free_list);
-        UNUSED(order);
-        /* BLANK END */
+        /* 标记页面为未分配 */
+        page->allocated = 0;
+
+        /* 尝试合并块 */
+        page = merge_chunk(pool, page);
+        order = page->order;
+
+        /* 将最终块放入对应order的空闲链表 */
+        free_list = &pool->free_lists[order].free_list;
+        list_add(&page->node, free_list);
+        pool->free_lists[order].nr_free++;
         /* LAB 2 TODO 1 END */
 
         unlock(&pool->buddy_lock);

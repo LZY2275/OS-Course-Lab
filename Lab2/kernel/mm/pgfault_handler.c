@@ -200,29 +200,41 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
 
                 fault_addr = ROUND_DOWN(fault_addr, PAGE_SIZE);
 
+                /* 尝试获取物理地址 */
                 pa = get_page_from_pmo(pmo, index);
                 if (pa == 0) {
-                        /*
-                         * Not committed before. Then, allocate the physical
-                         * page.
-                         */
-                        /* LAB 2 TODO 7 BEGIN */
-                        /* BLANK BEGIN */
-                        /* Hint: Allocate a physical page and clear it to 0. */
-
-                        /* BLANK END */
+                        /*物理页面为提交情况处理 */
+                        /*分配新的物理页面*/
+                        void *new_va = get_pages(0);
+                        long rss = 0;
+                        if (new_va == NULL) {
+                                unlock(&vmspace->vmspace_lock);
+                                return -ENOMEM;
+                        }
+                        pa = virt_to_phys(new_va);
+                        BUG_ON(pa == 0);
+                        /* Clear to 0 for the newly allocated page */
+                        /*将物理页面清零*/
+                        memset((void *)phys_to_virt(pa), 0, PAGE_SIZE);
                         /*
                          * Record the physical page in the radix tree:
                          * the offset is used as index in the radix tree
                          */
                         kdebug("commit: index: %ld, 0x%lx\n", index, pa);
+                        /*提交到内存对象radix树*/
                         commit_page_to_pmo(pmo, index, pa);
 
                         /* Add mapping in the page table */
                         lock(&vmspace->pgtbl_lock);
-                        /* BLANK BEGIN */
-
-                        /* BLANK END */
+                        /*在页表中建立映射*/
+                        map_range_in_pgtbl(vmspace->pgtbl,
+                                           fault_addr,
+                                           pa,
+                                           PAGE_SIZE,
+                                           perm,
+                                           &rss);
+                        /*更新进程的rss（驻留集大小）*/
+                        vmspace->rss += rss;
                         unlock(&vmspace->pgtbl_lock);
                 } else {
                         /*
@@ -246,17 +258,26 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                          * needs to add the mapping in the page table.
                          * Repeated mapping operations are harmless.
                          */
+                        /*物理页面已提交处理*/
+                        /*对于共享内存(PMO_SHM)或匿名内存(PMO_ANONYM)*/
                         if (pmo->type == PMO_SHM || pmo->type == PMO_ANONYM) {
                                 /* Add mapping in the page table */
+                                long rss = 0;
                                 lock(&vmspace->pgtbl_lock);
-                                /* BLANK BEGIN */
-
-                                /* BLANK END */
-                                /* LAB 2 TODO 7 END */
+                                /*在页表中建立映射*/
+                                map_range_in_pgtbl(vmspace->pgtbl,
+                                                   fault_addr,
+                                                   pa,
+                                                   PAGE_SIZE,
+                                                   perm,
+                                                   &rss);
+                                /*更新进程的rss（驻留集大小）*/
+                                vmspace->rss += rss;
                                 unlock(&vmspace->pgtbl_lock);
                         }
                 }
 
+                /*执行权限相关处理*/
                 if (perm & VMR_EXEC) {
                         arch_flush_cache(fault_addr, PAGE_SIZE, SYNC_IDCACHE);
                 }
@@ -332,9 +353,9 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
  * demanded fault: a permission fault with clearly defined desired_perm and
  * declared_perm combinations. e.g., declared = READ and desired = WRITE,
  * it would be forwarded to a specific handler, e.g. do_cow
- * 
- * A. demanded fault->specific handler->success 
- *      A.1. re-execute faulting instruction->success 
+ *
+ * A. demanded fault->specific handler->success
+ *      A.1. re-execute faulting instruction->success
  *      A.2. page swapped out by another thread->re-execute->trans fault
  * B. demanded fault->specific handler->return an EFAULT->fallback to trans fault
  * C. demanded fault->specific handler->return other error->kill process

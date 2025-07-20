@@ -461,10 +461,17 @@ __maybe_unused struct vmregion *find_vmr_for_va(struct vmspace *vmspace,
                                                 vaddr_t addr)
 {
         /* LAB 2 TODO 6 BEGIN */
-        /* Hint: Find the corresponding vmr for @addr in @vmspace */
-        /* BLANK BEGIN */
-        return NULL;
-        /* BLANK END */
+        struct vmregin *vmr;
+        struct rb_node *node;
+
+        // 使用红黑树快速查找地址对应的vmr
+        node = rb_search(&vmspace->vmr_tree, (const void *)&addr,
+                         cmp_vmr_and_va);
+        if (unlikely(node == NULL)) {
+                return NULL; // 没有找到对应的vmr
+        }
+        vmr = rb_entry(node, struct vmregion, tree_node);
+        return vmr;
         /* LAB 2 TODO 6 END */
 }
 

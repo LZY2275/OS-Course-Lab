@@ -77,6 +77,7 @@ void mm_init(void *physmem_info)
         /* Step-1: parse the physmem_info to get each continuous range of the
          * physmem. */
         physmem_map_num = 0;
+        // 解析并返回了可用物理内存区域，然后再对各可用物理内存区域初始化伙伴系统
         parse_mem_map(physmem_info);
 
         /* Step-2: init the buddy allocators for each continuous range of the
