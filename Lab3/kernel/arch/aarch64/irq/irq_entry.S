@@ -34,7 +34,14 @@
 .macro	exception_enter
 
 	/* LAB 3 TODO BEGIN */
-
+	stp	x0, x1, [sp, #-16]!
+    stp	x2, x3, [sp, #-16]!
+    stp	x4, x5, [sp, #-16]!
+    stp	x6, x7, [sp, #-16]!
+    stp	x8, x9, [sp, #-16]!
+    stp	x10, x11, [sp, #-16]!
+    stp	x12, x13, [sp, #-16]!
+    stp	x14, x15, [sp, #-16]!
 	/* LAB 3 TODO END */
 
 	mrs	x21, sp_el0
@@ -42,7 +49,14 @@
 	mrs	x23, spsr_el1
 
 	/* LAB 3 TODO BEGIN */
-
+	stp	x16, x17, [sp, #-16]!
+    stp	x18, x19, [sp, #-16]!
+    stp	x20, x21, [sp, #-16]!
+    stp	x22, x23, [sp, #-16]!
+    stp	x24, x25, [sp, #-16]!
+    stp	x26, x27, [sp, #-16]!
+    stp	x28, x29, [sp, #-16]!
+    stp	x30, xzr, [sp, #-16]!
 	/* LAB 3 TODO END */
 
 .endm
@@ -50,7 +64,15 @@
 .macro	exception_exit
 
 	/* LAB 3 TODO BEGIN */
-
+	/* 恢复寄存器 */
+    ldp	x30, xzr, [sp], #16
+    ldp	x28, x29, [sp], #16
+    ldp	x26, x27, [sp], #16
+    ldp	x24, x25, [sp], #16
+    ldp	x22, x23, [sp], #16
+    ldp	x20, x21, [sp], #16
+    ldp	x18, x19, [sp], #16
+    ldp	x16, x17, [sp], #16
 	/* LAB 3 TODO END */
 
 	msr	sp_el0, x21
@@ -58,7 +80,15 @@
 	msr	spsr_el1, x23
 
 	/* LAB 3 TODO BEGIN */
-
+	/* 恢复通用寄存器 */
+    ldp	x14, x15, [sp], #16
+    ldp	x12, x13, [sp], #16
+    ldp	x10, x11, [sp], #16
+    ldp	x8, x9, [sp], #16
+    ldp	x6, x7, [sp], #16
+    ldp	x4, x5, [sp], #16
+    ldp	x2, x3, [sp], #16
+    ldp	x0, x1, [sp], #16
 	/* LAB 3 TODO END */
 
 	eret
@@ -68,7 +98,8 @@
 .macro switch_to_cpu_stack
 	mrs     x24, TPIDR_EL1
 	/* LAB 3 TODO BEGIN */
-
+	/* 获取当前 CPU 的内核栈指针 */
+	add x24, x24, #OFFSET_LOCAL_CPU_STACK
 	/* LAB 3 TODO END */
 	ldr	x24, [x24]
 	mov	sp, x24
@@ -110,9 +141,26 @@
 /* el1_vector should be set in VBAR_EL1. The last 11 bits of VBAR_EL1 are reserved. */
 .align	11
 EXPORT(el1_vector)
-
 	/* LAB 3 TODO BEGIN */
+	exception_entry sync_el1t  // Synchronous EL1t
+	exception_entry irq_el1t  // IRQ EL1t
+	exception_entry fiq_el1t  // FIQ EL1t
+	exception_entry error_el1t  // Error EL1t
 
+	exception_entry sync_el1h  // Synchronous EL1h
+	exception_entry irq_el1h  // IRQ EL1h
+	exception_entry fiq_el1h  // FIQ EL1h
+	exception_entry error_el1h  // Error EL1h
+
+	exception_entry sync_el0_64  // Synchronous 64-bit EL0
+	exception_entry irq_el0_64  // IRQ 64-bit EL0
+	exception_entry fiq_el0_64  // FIQ 64-bit EL0
+	exception_entry error_el0_64  // Error 64-bit EL0
+
+	exception_entry sync_el0_32  // Synchronous 32-bit EL0
+	exception_entry irq_el0_32  // IRQ 32-bit EL0
+	exception_entry fiq_el0_32  // FIQ 32-bit EL0
+	exception_entry error_el0_32  // Error 32-bit EL0
 	/* LAB 3 TODO END */
 
 /*
@@ -146,7 +194,7 @@ error_el1t:
 error_el1h:
 sync_el1t:
 	/* LAB 3 TODO BEGIN */
-
+	bl unexpected_handler
 	/* LAB 3 TODO END */
 
 sync_el1h:
@@ -157,7 +205,8 @@ sync_el1h:
 
 	/* LAB 3 TODO BEGIN */
 	/* jump to handle_entry_c, store the return value as the ELR_EL1 */
-
+	bl	handle_entry_c
+	str	x0, [sp, #16 * 16] /* store the return value as the ELR_EL1 */
 	/* LAB 3 TODO END */
 	exception_exit
 

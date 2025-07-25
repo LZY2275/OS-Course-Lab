@@ -31,7 +31,7 @@ QEMU `raspi3b` 机器启动时，CPU 异常级别为 EL3，我们需要在启动
 ```
 
 > [!CODING] 练习题 2
-> 在 `arm64_elX_to_el1` 函数的 `LAB 1 TODO 1` 处填写一行汇编代码，获取 CPU 当前异常级别。
+> 在 `arm64_elX_to_el1` 函数的 ` 1` 处填写一行汇编代码，获取 CPU 当前异常级别。
 
 > [!HINT]
 > 通过 `CurrentEL` 系统寄存器可获得当前异常级别。通过 GDB 在指令级别单步调试可验证实现是否正确。注意参考文档理解 `CurrentEL` 各个 bits 的[意义](https://developer.arm.com/documentation/ddi0601/2020-12/AArch64-Registers/CurrentEL--Current-Exception-Level)。
@@ -40,7 +40,7 @@ QEMU `raspi3b` 机器启动时，CPU 异常级别为 EL3，我们需要在启动
 设置 `elr_elx`（异常链接寄存器）和 `spsr_elx`（保存的程序状态寄存器），分别控制`eret`执行后的指令地址（PC）和程序状态（包括异常返回后的异常级别）。
 
 > [!CODING] 练习题 3
-> 在 `arm64_elX_to_el1` 函数的 `LAB 1 TODO 2` 处填写大约 4 行汇编代码，设置从 EL3 跳转到 EL1 所需的 `elr_el3` 和 `spsr_el3` 寄存器值。
+> 在 `arm64_elX_to_el1` 函数的 ` 2` 处填写大约 4 行汇编代码，设置从 EL3 跳转到 EL1 所需的 `elr_el3` 和 `spsr_el3` 寄存器值。
 
 > [!HINT]
 > `elr_el3` 的正确设置应使得控制流在 `eret` 后从 `arm64_elX_to_el1` 返回到 `_start` 继续执行初始化。 `spsr_el3` 的正确设置应正确屏蔽 DAIF 四类中断，并且将 [SP](https://developer.arm.com/documentation/ddi0500/j/CHDDGJID) 正确设置为 `EL1h`. 在设置好这两个系统寄存器后，不需要立即 `eret`.

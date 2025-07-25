@@ -23,7 +23,15 @@ void init_thread_ctx(struct thread *thread, vaddr_t stack, vaddr_t func,
 
         /* LAB 3 TODO BEGIN */
         /* SP_EL0, ELR_EL1, SPSR_EL1*/
-
+        /* 设置用户态栈指针 */
+        thread->thread_ctx->ec.reg[SP_EL0] = stack;
+        /* 设置用户态程序计数器（入口地址） */
+        thread->thread_ctx->ec.reg[ELR_EL1] = func;
+        /* 设置程序状态寄存器 */
+        thread->thread_ctx->ec.reg[SPSR_EL1] = SPSR_EL1_EL0t | SPSR_EL1_DAIF_MASK;
+        /* SPSR_EL1_EL0t: 表示从 EL1 切换到 EL0 的线程模式 */
+        /* SPSR_EL1_DAIF_MASK: 禁用中断（Debug, SError, IRQ, FIQ） */
+        
         /* LAB 3 TODO END */
 
         /* Set the state of the thread */

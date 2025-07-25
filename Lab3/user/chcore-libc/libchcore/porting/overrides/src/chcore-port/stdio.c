@@ -131,7 +131,9 @@ static int get_one_char(void)
 static void put(char buffer[], unsigned size)
 {
         /* LAB 3 TODO BEGIN */
-
+        for (unsigned i = 0; i < size; i++) {
+                raw_syscall(SYS_write, STDOUT_FILENO, &buffer[i], 1);
+        }
         /* LAB 3 TODO END */
 }
 

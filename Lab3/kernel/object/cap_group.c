@@ -348,7 +348,7 @@ cap_t sys_create_cap_group(unsigned long cap_group_args_p)
         /* cap current cap_group */
         /* LAB 3 TODO BEGIN */
         /* Allocate a new cap_group object */
-
+        new_cap_group = obj_alloc(TYPE_CAP_GROUP, sizeof(*new_cap_group))
         /* LAB 3 TODO END */
         if (!new_cap_group) {
                 r = -ENOMEM;
@@ -356,7 +356,10 @@ cap_t sys_create_cap_group(unsigned long cap_group_args_p)
         }
         /* LAB 3 TODO BEGIN */
         /* initialize cap group from user*/
-
+        r = cap_group_init_user(new_cap_group, BASE_OBJECT_NUM, &args);
+        if (r != 0) {
+                goto out_free_obj_new_grp;
+        }
         /* LAB 3 TODO END */
 
         cap = cap_alloc(current_cap_group, new_cap_group);
@@ -380,7 +383,11 @@ cap_t sys_create_cap_group(unsigned long cap_group_args_p)
 
         /* 2st cap is vmspace */
         /* LAB 3 TODO BEGIN */
-
+        vmspace = obj_alloc(TYPE_VMSPACE, sizeof(*vmspace));
+        if (!vmspace) {
+                r = -ENOMEM;
+                goto out_free_cap_grp_current;
+        }
         /* LAB 3 TODO END */
 
         if (!vmspace) {
@@ -418,22 +425,20 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
         cap_t slot_id;
 
         /* LAB 3 TODO BEGIN */
-        UNUSED(vmspace);
-        UNUSED(cap_group);
-
+        cap_group = obj_alloc(TYPE_CAP_GROUP, sizeof(*cap_group));
         /* LAB 3 TODO END */
         BUG_ON(!cap_group);
 
         /* LAB 3 TODO BEGIN */
         /* initialize cap group with common, use ROOT_CAP_GROUP_BADGE */
-
+        cap_group_init(cap_group, BASE_OBJECT_NUM, ROOT_CAP_GROUP_BADGE);
         /* LAB 3 TODO END */
         slot_id = cap_alloc(cap_group, cap_group);
 
         BUG_ON(slot_id != CAP_GROUP_OBJ_ID);
 
         /* LAB 3 TODO BEGIN */
-
+        vmspace = obj_alloc(TYPE_VMSPACE, sizeof(*vmspace));
         /* LAB 3 TODO END */
         BUG_ON(!vmspace);
 
@@ -441,7 +446,7 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
         vmspace_init(vmspace, ROOT_PROCESS_PCID);
 
         /* LAB 3 TODO BEGIN */
-
+        slot_id = cap_alloc(cap_group, vmspace);
         /* LAB 3 TODO END */
 
         BUG_ON(slot_id != VMSPACE_OBJ_ID);

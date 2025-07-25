@@ -88,6 +88,7 @@ void init_kernel_pt(void)
         /* LAB 1 TODO 5 BEGIN */
         /* Step 1: set L0 and L1 page table entry */
         /* BLANK BEGIN */
+        vaddr = PHYSMEM_START; // 重新初始化 vaddr
         boot_ttbr1_l0[GET_L0_INDEX(vaddr)] = ((u64)boot_ttbr1_l1) | IS_TABLE
                                              | IS_VALID | NG;
         boot_ttbr1_l1[GET_L1_INDEX(vaddr)] = ((u64)boot_ttbr1_l2) | IS_TABLE
